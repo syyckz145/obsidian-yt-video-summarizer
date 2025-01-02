@@ -3,6 +3,8 @@ import { MarkdownView, Notice, Plugin } from 'obsidian';
 import { PluginSettings } from './types';
 import { SettingsTab } from './settings';
 import { StorageService } from './services/storage';
+import { YouTubeService } from './services/youtube';
+import { YouTubeURLModal } from './modals/youtube-url';
 
 /**
  * Represents the YouTube Summarizer Plugin.
@@ -12,7 +14,8 @@ import { StorageService } from './services/storage';
 export class YouTubeSummarizerPlugin extends Plugin {
 	settings: PluginSettings;
     private storageService: StorageService;
-    private isProcessing = false;
+	private youtubeService: YouTubeService;
+	private isProcessing: boolean;
 
 	/**
 	 * Called when the plugin is loaded.
@@ -44,6 +47,9 @@ export class YouTubeSummarizerPlugin extends Plugin {
 		// Initialize storage service
         this.storageService = new StorageService(this);
 		await this.storageService.loadData();
+
+		// Initialize youtube service
+		this.youtubeService = new YouTubeService();
 	}
 	
 	/**
@@ -72,7 +78,12 @@ export class YouTubeSummarizerPlugin extends Plugin {
 		await this.storageService.updateSettings(settings);
 		this.settings = await this.storageService.getSettings();
    }
-
+	
+	/**
+	* Handles the summarize command.
+	* This method retrieves the selected YouTube URL from the active markdown view and summarizes the video.
+	* @returns {Promise<void>} A promise that resolves when the command is handled.
+	*/
 	private async handleSummarizeCommand(): Promise<void> {
 		// Get the active markdown view
 		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -87,8 +98,16 @@ export class YouTubeSummarizerPlugin extends Plugin {
 			new Notice('Please select a YouTube URL');
 			return;
 		}
+
+		// Summarize the video using the selected URL
+		await this.summarizeVideo(selection, activeView);
 	}
 
+	/**
+	 * Handles the summarize command with a prompt.
+	 * This method opens a modal to input the YouTube URL and summarizes the video.
+	 * @returns {Promise<void>} A promise that resolves when the command is handled.
+	 */
 	private async handleSummarizeCommandWithPrompt(): Promise<void> {
 		// Get the active markdown view
 		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -96,7 +115,46 @@ export class YouTubeSummarizerPlugin extends Plugin {
 			new Notice('No active markdown view');
 			return;
 		}
+
+		// Open the YouTube URL modal and handle the submitted URL
+		new YouTubeURLModal(this.app, async (url: string) => {
+			await this.summarizeVideo(url, activeView);
+		}).open();
 	}
+
+	/**
+	 * Summarizes the YouTube video for the given URL and updates the markdown view with the summary.
+	 * @param url - The URL of the YouTube video to summarize.
+	 * @param view - The active markdown view where the summary will be inserted.
+	 * @returns {Promise<void>} A promise that resolves when the video is summarized.
+	 */
+	private async summarizeVideo(url: string, view: MarkdownView): Promise<void> {
+		// Check if a video is already being processed
+		if (this.isProcessing) {
+			new Notice('Already processing a video, please wait...');
+			return;
+		}
+		
+		try {
+			this.isProcessing = true;
+			// Ensure the Gemini API key is set
+			if (!this.settings.geminiApiKey) {
+				new Notice('Gemini API key is missing. Please set it in the plugin settings.');
+				return;
+			}
+
+			// Fetch the video transcript
+			new Notice('Fetching video transcript...');
+			const transcript = await this.youtubeService.fetchTranscript(url);
+			const thumbnailUrl = YouTubeService.getThumbnailUrl(transcript.videoId);
+
+		} catch (error) {
+			new Notice(`Error: ${error.message}`);
+		} finally {
+			// Reset the processing flag
+			this.isProcessing = false;
+		}
+    }
 
 }
 
