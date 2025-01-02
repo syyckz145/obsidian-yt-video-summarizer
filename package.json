@@ -1,15 +1,22 @@
 {
-	"name": "obsidian-sample-plugin",
+	"name": "obsidian-yt-video-summarizer",
 	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"description": "Summarize YouTube videos using Gemini AI. Extract transcripts, generate summaries, and create structured notes.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"version": "node version-bump.mjs && git add manifest.json versions.json"
 	},
-	"keywords": [],
-	"author": "",
+	"keywords": [
+		"obsidian",
+		"youtube",
+		"summarizer",
+		"gemini",
+		"ai",
+		"transcript"
+	],
+	"author": "mbramani",
 	"license": "MIT",
 	"devDependencies": {
 		"@types/node": "^16.11.6",
