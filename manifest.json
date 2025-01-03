@@ -4,7 +4,7 @@
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
 	"description": "Summarize YouTube videos using Gemini AI. Extract transcripts, generate summaries, and create structured notes.",
-	"author": "Mohit Ramani",
+	"author": "mbramani",
 	"authorUrl": "https://github.com/mbramani",
 	"isDesktopOnly": false
 }
