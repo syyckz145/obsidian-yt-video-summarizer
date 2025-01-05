@@ -23,43 +23,49 @@ export class YouTubeURLModal extends Modal {
 	onOpen() {
 		const { contentEl } = this;
 		contentEl.empty();
+		
+		// Create modal content
+		contentEl.createDiv({ cls: 'yt-summarizer-modal' }, (modalEl) => {
+			modalEl.createEl('h2', {
+				text: 'Enter YouTube URL',
+				cls: 'yt-summarizer-modal__title'
+			});
+		
+			// Input field for YouTube URL
+			const inputEl = modalEl.createEl('input', {
+				type: 'text',
+				placeholder: 'https://www.youtube.com/watch?v=...',
+				cls: 'yt-summarizer__input'
+			});
+		
+			// Action buttons
+			const actions = modalEl.createDiv({ cls: 'yt-summarizer__actions' });
 
-		// Add modal title
-		contentEl.createEl("h2", { text: "Enter YouTube URL" });
+			const submitBtn = actions.createEl('button', {
+				text: 'Submit',
+				cls: 'yt-summarizer__button yt-summarizer__button--primary'
+			});
 
-		// Add input field for URL
-		const inputEl = contentEl.createEl("input", {
-			type: "text",
-			placeholder: "https://www.youtube.com/watch?v=..."
+			const cancelBtn = actions.createEl('button', {
+				text: 'Cancel',
+				cls: 'yt-summarizer__button yt-summarizer__button--danger'
+			});
+
+			// Handle submit button click
+			submitBtn.addEventListener("click", () => {
+				const url = inputEl.value.trim();
+				if (url) {
+					this.onSubmit(url);
+					this.close();
+				} else {
+					new Notice('Please enter a valid URL');
+				}
+			});
+
+			// Handle cancel button click
+			cancelBtn.addEventListener("click", () => this.close());
+
 		});
-		inputEl.style.width = "100%";
-		inputEl.style.marginBottom = "1em";
-
-		// Add submit and cancel button container
-		const buttonContainer = contentEl.createDiv();
-		buttonContainer.style.display = "flex";
-		buttonContainer.style.justifyContent = "flex-end";
-		buttonContainer.style.gap = "10px";
-
-		// Add submit button
-		const submitButton = buttonContainer.createEl("button", { text: "Submit" });
-		submitButton.style.backgroundColor = "var(--interactive-accent)";
-		submitButton.style.color = "white";
-		submitButton.addEventListener("click", () => {
-			const url = inputEl.value.trim();
-			if (url) {
-				this.onSubmit(url);
-				this.close();
-			} else {
-				new Notice('Please enter a valid URL');
-			}
-		});
-
-		// Add cancel button
-		const cancelButton = buttonContainer.createEl("button", { text: "Cancel" });
-		cancelButton.style.backgroundColor = "red";
-		cancelButton.style.color = "white";
-		cancelButton.addEventListener("click", () => this.close());
 	}
 
 	/**

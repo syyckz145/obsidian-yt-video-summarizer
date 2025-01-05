@@ -29,7 +29,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 export const TITLE_REGEX = /<meta\s+name="title"\s+content="([^"]*)">/;
 
 // Regex pattern for extracting video ID from YouTube URL
-export const VIDEO_ID_REGEX = /(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/s]{11})/;
+export const VIDEO_ID_REGEX = /(?:v=|\/)([a-zA-Z0-9_-]{11})/;
 
 // Regex pattern for extracting video author from meta tag
 export const AUTHOR_REGEX = /<link itemprop="name" content="([^"]+)">/;
