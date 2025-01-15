@@ -1,5 +1,5 @@
+import { Editor, MarkdownView, Notice, Plugin } from 'obsidian';
 import { GeminiResponse, PluginSettings, TranscriptResponse } from './types';
-import { MarkdownView, Notice, Plugin } from 'obsidian';
 
 import { GeminiService } from './services/gemini';
 import { SettingsTab } from './settings';
@@ -14,10 +14,10 @@ import { YouTubeURLModal } from './modals/youtube-url';
  */
 export class YouTubeSummarizerPlugin extends Plugin {
 	settings: PluginSettings;
-    private storageService: StorageService;
-    private youtubeService: YouTubeService;
-    private geminiService: GeminiService;
-    private isProcessing = false;
+	private storageService: StorageService;
+	private youtubeService: YouTubeService;
+	private geminiService: GeminiService;
+	private isProcessing = false;
 
 	/**
 	 * Called when the plugin is loaded.
@@ -32,11 +32,9 @@ export class YouTubeSummarizerPlugin extends Plugin {
 
 			// Register commands
 			this.registerCommands();
-		} catch (error) { 
+		} catch (error) {
 			new Notice(`Error: ${error.message}`);
-			console.log(error);
 		}
-
 	}
 
 	/**
@@ -47,38 +45,75 @@ export class YouTubeSummarizerPlugin extends Plugin {
 	 */
 	private async initializeServices(): Promise<void> {
 		// Initialize storage service
-        this.storageService = new StorageService(this);
+		this.storageService = new StorageService(this);
 		await this.storageService.loadData();
 
 		// Initialize youtube service
 		this.youtubeService = new YouTubeService();
 
 		// Initialize gemini service
-        this.settings = await this.storageService.getSettings();
+		this.settings = await this.storageService.getSettings();
 		this.geminiService = new GeminiService(this.settings);
 	}
-	
+
 	/**
 	 * Registers the plugin commands.
 	 * This method adds the commands to the Obsidian app.
 	 * @returns {void}
 	 */
 	private registerCommands(): void {
-		// Register the summarize command 
-        this.addCommand({
-            id: 'summarize-youtube-video',
-            name: 'Summarize YouTube Video',
-			callback: () => this.handleSummarizeCommand()
-        });
+		// Register the summarize command
+		// Command to summarize a YouTube video from URL
+		this.addCommand({
+			id: 'summarize-youtube-video',
+			name: 'Summarize YouTube Video',
+			editorCallback: async (editor: Editor, view: MarkdownView) => {
+				try {
+					const selectedText = editor.getSelection().trim();
+					if (
+						selectedText &&
+						YouTubeService.isYouTubeUrl(selectedText)
+					) {
+						await this.summarizeVideo(selectedText, editor);
+					} else if (selectedText) {
+						new Notice('Selected text is not a valid YouTube URL');
+					} else {
+						new YouTubeURLModal(this.app, async (url) => {
+							await this.summarizeVideo(url, editor);
+						}).open();
+					}
+				} catch (error) {
+					new Notice(`Failed to process video: ${error.message}`);
+				}
+			},
+		});
 
-		// Register the summarize command with prompt
-        this.addCommand({
-            id: 'summarize-youtube-video-prompt',
-            name: 'Summarize YouTube Video (Prompt)',
-            callback: () => this.handleSummarizeCommandWithPrompt()
-        });
+		// Command to summarize a YouTube video with custom prompt
+		this.addCommand({
+			id: 'summarize-youtube-video-prompt',
+			name: 'Summarize YouTube Video (With Prompt)',
+			editorCallback: async (editor: Editor, view: MarkdownView) => {
+				try {
+					const selectedText = editor.getSelection().trim();
+					if (
+						selectedText &&
+						YouTubeService.isYouTubeUrl(selectedText)
+					) {
+						await this.summarizeVideo(selectedText, editor);
+					} else if (selectedText) {
+						new Notice('Selected text is not a valid YouTube URL');
+					} else {
+						new YouTubeURLModal(this.app, async (url) => {
+							await this.summarizeVideo(url, editor);
+						}).open();
+					}
+				} catch (error) {
+					new Notice(`Failed to process video: ${error.message}`);
+				}
+			},
+		});
 	}
-	
+
 	/**
 	 * Updates the plugin settings.
 	 * This method updates the settings in the storage service and reinitializes the Gemini service.
@@ -92,49 +127,6 @@ export class YouTubeSummarizerPlugin extends Plugin {
 
 		// Reinitializes the Gemini service
 		this.geminiService = new GeminiService(this.settings);
-    }
-	
-	/**
-	 * Handles the summarize command.
-	 * This method retrieves the selected YouTube URL from the active markdown view and summarizes the video.
-	 * @returns {Promise<void>} A promise that resolves when the command is handled.
-	 */
-	private async handleSummarizeCommand(): Promise<void> {
-		// Get the active markdown view
-		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-		if (!activeView) {
-			new Notice('No active markdown view');
-			return;
-		}
-
-		// Get the selected text (YouTube URL)
-		const selection = activeView.editor.getSelection().trim();
-		if (!selection) {
-			new Notice('Please select a YouTube URL');
-			return;
-		}
-
-		// Summarize the video using the selected URL
-		await this.summarizeVideo(selection, activeView);
-	}
-
-	/**
-	 * Handles the summarize command with a prompt.
-	 * This method opens a modal to input the YouTube URL and summarizes the video.
-	 * @returns {Promise<void>} A promise that resolves when the command is handled.
-	 */
-	private async handleSummarizeCommandWithPrompt(): Promise<void> {
-		// Get the active markdown view
-		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-		if (!activeView) {
-			new Notice('No active markdown view');
-			return;
-		}
-
-		// Open the YouTube URL modal and handle the submitted URL
-		new YouTubeURLModal(this.app, async (url: string) => {
-			await this.summarizeVideo(url, activeView);
-		}).open();
 	}
 
 	/**
@@ -143,37 +135,46 @@ export class YouTubeSummarizerPlugin extends Plugin {
 	 * @param view - The active markdown view where the summary will be inserted.
 	 * @returns {Promise<void>} A promise that resolves when the video is summarized.
 	 */
-	private async summarizeVideo(url: string, view: MarkdownView): Promise<void> {
+	private async summarizeVideo(url: string, editor: Editor): Promise<void> {
 		// Check if a video is already being processed
 		if (this.isProcessing) {
 			new Notice('Already processing a video, please wait...');
 			return;
 		}
-		
+
 		try {
 			this.isProcessing = true;
 			// Ensure the Gemini API key is set
 			if (!this.settings.geminiApiKey) {
-				new Notice('Gemini API key is missing. Please set it in the plugin settings.');
+				new Notice(
+					'Gemini API key is missing. Please set it in the plugin settings.'
+				);
 				return;
 			}
 
 			// Fetch the video transcript
 			new Notice('Fetching video transcript...');
 			const transcript = await this.youtubeService.fetchTranscript(url);
-			const thumbnailUrl = YouTubeService.getThumbnailUrl(transcript.videoId);
+			const thumbnailUrl = YouTubeService.getThumbnailUrl(
+				transcript.videoId
+			);
 
 			// Generate the summary using Gemini service
 			new Notice('Generating summary...');
 			const geminiSummary = await this.geminiService.summarize(
-				transcript.lines.map(line => line.text).join(' ')
+				transcript.lines.map((line) => line.text).join(' ')
 			);
-			
+
 			// Create the summary content
-			const summary = this.generateSummary(transcript, thumbnailUrl, url, geminiSummary);
-			
+			const summary = this.generateSummary(
+				transcript,
+				thumbnailUrl,
+				url,
+				geminiSummary
+			);
+
 			// Insert the summary into the markdown view
-			view.editor.replaceSelection(summary);
+			editor.replaceSelection(summary);
 			new Notice('Summary generated successfully!');
 		} catch (error) {
 			new Notice(`Error: ${error.message}`);
@@ -181,7 +182,7 @@ export class YouTubeSummarizerPlugin extends Plugin {
 			// Reset the processing flag
 			this.isProcessing = false;
 		}
-    }
+	}
 
 	/**
 	 * Generates a summary string based on the provided transcript, thumbnail URL, video URL, and Gemini summary.
@@ -193,8 +194,8 @@ export class YouTubeSummarizerPlugin extends Plugin {
 	 * @returns A formatted summary string.
 	 */
 	private generateSummary(
-		transcript: TranscriptResponse, 
-		thumbnailUrl: string, 
+		transcript: TranscriptResponse,
+		thumbnailUrl: string,
 		url: string,
 		geminiSummary: GeminiResponse
 	): string {
@@ -204,14 +205,17 @@ export class YouTubeSummarizerPlugin extends Plugin {
 			`![Thumbnail](${thumbnailUrl})\n`,
 			`👤 [${transcript.author}](${transcript.channelUrl})  🔗 [Watch Video](${url})`,
 			`## Summary\n${geminiSummary.summary}`,
-			`## Key Points\n${geminiSummary.keyPoints.map(point => `- ${point}`).join('\n')}`
+			`## Key Points\n${geminiSummary.keyPoints.map((point) => `- ${point}`).join('\n')}`,
 		];
 
 		// Add technical terms section if available
 		if (geminiSummary.technicalTerms.length > 0) {
 			summaryParts.push(
 				`## Technical Terms\n${geminiSummary.technicalTerms
-					.map(term => `- **${term.term}**: ${term.explanation}`).join('\n')}`
+					.map(
+						(term) => `- **[[${term.term}]]**: ${term.explanation}`
+					)
+					.join('\n')}`
 			);
 		}
 
@@ -220,7 +224,6 @@ export class YouTubeSummarizerPlugin extends Plugin {
 
 		return summaryParts.join('\n');
 	}
-
 }
 
 export default YouTubeSummarizerPlugin;
