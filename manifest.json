@@ -1,8 +1,8 @@
 {
 	"id": "yt-video-summarizer",
 	"name": "YouTube Video Summarizer",
-	"version": "1.0.1",
 	"minAppVersion": "0.15.0",
+	"version": "1.0.1",
 	"description": "Summarize YouTube videos using Gemini AI. Extract transcripts, generate summaries, and create structured notes.",
 	"author": "mbramani",
 	"authorUrl": "https://github.com/mbramani",
