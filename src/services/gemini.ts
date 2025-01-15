@@ -22,8 +22,8 @@ export class GeminiService {
 			model: settings.selectedModel,
 			generationConfig: {
 				maxOutputTokens: settings.maxTokens,
-				temperature: settings.temperature
-			}
+				temperature: settings.temperature,
+			},
 		});
 	}
 
@@ -75,26 +75,32 @@ export class GeminiService {
 	private parseResponse(text: string): GeminiResponse {
 		try {
 			// Remove any leading/trailing whitespace and backticks
-			const cleanText = text.replace(/```json\s*|\s*```/g, '')  // Remove code block markers
-            .replace(/^\s+|\s+$/g, '')          // Trim whitespace
-            .replace(/\n\s*\n/g, '\n');         // Remove extra newlines
+			const cleanText = text
+				.replace(/```json\s*|\s*```/g, '') // Remove code block markers
+				.replace(/^\s+|\s+$/g, '') // Trim whitespace
+				.replace(/\n\s*\n/g, '\n'); // Remove extra newlines
 
 			// Parse the cleaned text
 			const parsed = JSON.parse(cleanText);
-            
+
 			// Validate response structure
 			if (!this.isValidResponse(parsed)) {
 				throw new Error('Invalid response structure');
 			}
-            
+
 			return parsed;
 		} catch (error) {
-			console.error('Response parsing error:', error, '\nRaw text:', text);
+			console.error(
+				'Response parsing error:',
+				error,
+				'\nRaw text:',
+				text
+			);
 			return {
 				summary: 'Failed to parse response. Please try again.',
 				keyPoints: [],
 				technicalTerms: [],
-				conclusion: ''
+				conclusion: '',
 			};
 		}
 	}

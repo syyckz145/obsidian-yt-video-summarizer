@@ -1,4 +1,4 @@
-import { App, Modal, Notice } from "obsidian";
+import { App, Modal, Notice } from 'obsidian';
 
 /**
  * A modal dialog for entering a YouTube URL.
@@ -17,42 +17,44 @@ export class YouTubeURLModal extends Modal {
 	}
 
 	/**
-	 * Called when the modal is opened. 
+	 * Called when the modal is opened.
 	 * Sets up the modal content.
 	 */
 	onOpen() {
 		const { contentEl } = this;
 		contentEl.empty();
-		
+
 		// Create modal content
 		contentEl.createDiv({ cls: 'yt-summarizer-modal' }, (modalEl) => {
 			modalEl.createEl('h2', {
 				text: 'Enter YouTube URL',
-				cls: 'yt-summarizer-modal__title'
+				cls: 'yt-summarizer-modal__title',
 			});
-		
+
 			// Input field for YouTube URL
 			const inputEl = modalEl.createEl('input', {
 				type: 'text',
 				placeholder: 'https://www.youtube.com/watch?v=...',
-				cls: 'yt-summarizer__input'
+				cls: 'yt-summarizer__input',
 			});
-		
+
 			// Action buttons
-			const actions = modalEl.createDiv({ cls: 'yt-summarizer__actions' });
+			const actions = modalEl.createDiv({
+				cls: 'yt-summarizer__actions',
+			});
 
 			const submitBtn = actions.createEl('button', {
 				text: 'Submit',
-				cls: 'yt-summarizer__button yt-summarizer__button--primary'
+				cls: 'yt-summarizer__button yt-summarizer__button--primary',
 			});
 
 			const cancelBtn = actions.createEl('button', {
 				text: 'Cancel',
-				cls: 'yt-summarizer__button yt-summarizer__button--danger'
+				cls: 'yt-summarizer__button yt-summarizer__button--danger',
 			});
 
 			// Handle submit button click
-			submitBtn.addEventListener("click", () => {
+			submitBtn.addEventListener('click', () => {
 				const url = inputEl.value.trim();
 				if (url) {
 					this.onSubmit(url);
@@ -63,13 +65,12 @@ export class YouTubeURLModal extends Modal {
 			});
 
 			// Handle cancel button click
-			cancelBtn.addEventListener("click", () => this.close());
-
+			cancelBtn.addEventListener('click', () => this.close());
 		});
 	}
 
 	/**
-	 * Called when the modal is closed. 
+	 * Called when the modal is closed.
 	 * Cleans up the modal content.
 	 */
 	onClose() {

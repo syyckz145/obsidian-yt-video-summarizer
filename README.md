@@ -8,11 +8,11 @@ Generate AI-powered summaries of YouTube videos directly in Obsidian using Googl
 
 ## Features
 
-- 🎥 Extract transcripts from YouTube videos
-- 🤖 Generate summaries using Gemini AI
-- 📝 Create structured notes with key points
-- 🔍 Identify and explain technical terms
-- 📊 Format summaries with metadata and tags
+-   🎥 Extract transcripts from YouTube videos
+-   🤖 Generate summaries using Gemini AI
+-   📝 Create structured notes with key points
+-   🔍 Identify and explain technical terms
+-   📊 Format summaries with metadata and tags
 
 ## Installation
 
@@ -23,8 +23,8 @@ Generate AI-powered summaries of YouTube videos directly in Obsidian using Googl
 
 ## Requirements
 
-- Obsidian v0.15.0+
-- Google Gemini API key ([Get one here](https://aistudio.google.com/app/apikey))
+-   Obsidian v0.15.0+
+-   Google Gemini API key ([Get one here](https://aistudio.google.com/app/apikey))
 
 ## Configuration
 
@@ -51,23 +51,26 @@ Generate AI-powered summaries of YouTube videos directly in Obsidian using Googl
 ## Output Format
 
 ```markdown
-
 # Video Title
 
 [Video thumbnail]
 
 ## Summary
+
 [AI-generated summary]
 
 ## Key Points
-- Point 1
-- Point 2
+
+-   Point 1
+-   Point 2
 
 ## Technical Terms
-- Term 1: Definition
-- Term 2: Definition
+
+-   Term 1: Definition
+-   Term 2: Definition
 
 ## Conclusion
+
 [Summary conclusion]
 ```
 

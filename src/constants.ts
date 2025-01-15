@@ -1,11 +1,11 @@
-import { PluginSettings } from "./types";
+import { PluginSettings } from './types';
 
 // List of supported Gemini models
 export const GEMINI_MODELS = [
 	'gemini-2.0-flash-exp',
 	'gemini-1.5-flash',
 	'gemini-1.5-flash-8b',
-	'gemini-1.5-pro'
+	'gemini-1.5-pro',
 ] as const;
 
 // Default prompt for video analysis
@@ -22,7 +22,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	selectedModel: 'gemini-1.5-pro',
 	customPrompt: DEFAULT_PROMPT,
 	maxTokens: 3000,
-	temperature: 1
+	temperature: 1,
 };
 
 // Regex pattern for extracting video title from meta tag
