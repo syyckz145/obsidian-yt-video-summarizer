@@ -66,7 +66,7 @@ export class YouTubeSummarizerPlugin extends Plugin {
 		// Command to summarize a YouTube video from URL
 		this.addCommand({
 			id: 'summarize-youtube-video',
-			name: 'Summarize YouTube Video',
+			name: 'Summarize YouTube video',
 			editorCallback: async (editor: Editor, view: MarkdownView) => {
 				try {
 					const selectedText = editor.getSelection().trim();
@@ -205,13 +205,15 @@ export class YouTubeSummarizerPlugin extends Plugin {
 			`![Thumbnail](${thumbnailUrl})\n`,
 			`👤 [${transcript.author}](${transcript.channelUrl})  🔗 [Watch Video](${url})`,
 			`## Summary\n${geminiSummary.summary}`,
-			`## Key Points\n${geminiSummary.keyPoints.map((point) => `- ${point}`).join('\n')}`,
+			`## Key points\n${geminiSummary.keyPoints
+				.map((point) => `- ${point}`)
+				.join('\n')}`,
 		];
 
 		// Add technical terms section if available
 		if (geminiSummary.technicalTerms.length > 0) {
 			summaryParts.push(
-				`## Technical Terms\n${geminiSummary.technicalTerms
+				`## Technical terms\n${geminiSummary.technicalTerms
 					.map(
 						(term) => `- **[[${term.term}]]**: ${term.explanation}`
 					)

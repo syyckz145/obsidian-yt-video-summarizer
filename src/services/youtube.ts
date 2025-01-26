@@ -50,8 +50,12 @@ export class YouTubeService {
 	 * console.log(isYoutube); // true
 	 */
 	static isYouTubeUrl(url: string): boolean {
-		return url.includes('youtube.com/') || url.includes('youtu.be/');
+		return (
+			url.startsWith('https://www.youtube.com/') ||
+			url.startsWith('https://youtu.be/')
+		);
 	}
+
 	/**
 	 * Fetches and processes a YouTube video transcript
 	 * @param url - Full YouTube video URL
@@ -148,10 +152,10 @@ export class YouTubeService {
 			data?.captions?.playerCaptionsTracklistRenderer?.captionTracks ||
 			[];
 		const captionTrack = langCode
-			? captionTracks.find((track: any) =>
-					track.languageCode.includes(langCode)
-				) || captionTracks[0]
-			: captionTracks[0];
+					? captionTracks.find((track: any) =>
+							track.languageCode.includes(langCode)
+					) || captionTracks[0]
+					: captionTracks[0];
 
 		if (!captionTrack) throw new Error('No captions available');
 

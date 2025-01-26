@@ -8,7 +8,9 @@ function updateVersionFiles(targetVersion) {
 	// Validate version format (semver)
 	const semverRegex = /^\d+\.\d+\.\d+$/;
 	if (!semverRegex.test(targetVersion)) {
-		throw new Error(`Invalid version format: ${targetVersion}. Expected format: x.y.z`);
+		throw new Error(
+			`Invalid version format: ${targetVersion}. Expected format: x.y.z`
+		);
 	}
 
 	// Read manifest.json
@@ -52,8 +54,11 @@ try {
 		throw new Error('No version specified in environment variables');
 	}
 
-	const { targetVersion: newVersion, minAppVersion } = updateVersionFiles(targetVersion);
-	console.log(`✓ Successfully updated version to ${newVersion} (minAppVersion: ${minAppVersion})`);
+	const { targetVersion: newVersion, minAppVersion } =
+		updateVersionFiles(targetVersion);
+	console.log(
+		`✓ Successfully updated version to ${newVersion} (minAppVersion: ${minAppVersion})`
+	);
 } catch (error) {
 	console.error('Error:', error.message);
 	process.exit(1);

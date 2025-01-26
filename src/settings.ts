@@ -33,11 +33,11 @@ export class SettingsTab extends PluginSettingTab {
 
 		// Setting for Gemini API Key
 		new Setting(containerEl)
-			.setName('Gemini api key')
-			.setDesc('Enter your Gemini api key')
+			.setName('Gemini API key')
+			.setDesc('Enter your Gemini API key')
 			.addText((text) =>
 				text
-					.setPlaceholder('Enter api key')
+					.setPlaceholder('Enter API key')
 					.setValue(this.plugin.settings.geminiApiKey)
 					.onChange(async (value) => {
 						await this.plugin.updateSettings({
