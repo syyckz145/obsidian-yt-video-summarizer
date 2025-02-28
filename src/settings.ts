@@ -78,6 +78,12 @@ export class SettingsTab extends PluginSettingTab {
 							customPrompt: value,
 						});
 					})
+					.then(textArea => {
+						// Set width to 50% of container
+						textArea.inputEl.style.width = '500px';
+						// Set height to accommodate approximately 10 lines
+						textArea.inputEl.style.height = '200px';
+					})
 			);
 
 		// Setting for Max Tokens
