@@ -17,7 +17,7 @@ export class PromptService {
 	 * @returns Prompt string for AI
 	 * @example
 	 * const prompt = promptService.buildPrompt('This is a sample transcript.');
-	 * console.log(prompt); // 'Custom prompt\n\nTitle:\nMy Video Title\n\nTranscript:\nThis is a sample transcript.'
+	 * console.log(prompt); // 'Custom prompt\n\nTranscript:\nThis is a sample transcript.'
 	 */
 	buildPrompt(transcriptText: string): string {
 		return `${this.customPrompt}\n\nTranscript:\n${transcriptText}`;

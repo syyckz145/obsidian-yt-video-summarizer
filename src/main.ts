@@ -134,6 +134,7 @@ export class YouTubeSummarizerPlugin extends Plugin {
 
 		// Reinitializes the Gemini service
 		this.geminiService = new GeminiService(this.settings);
+		this.promptService = new PromptService(this.settings.customPrompt);
 	}
 
 	/**
