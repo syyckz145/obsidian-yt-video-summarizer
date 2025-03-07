@@ -39,11 +39,3 @@ export interface ThumbnailQuality {
 	standard: string; // 640x480
 	maxres: string; // 1280x720
 }
-
-/** Response structure for Gemini AI summary */
-export interface GeminiResponse {
-	summary: string;
-	keyPoints: string[];
-	technicalTerms: { term: string; explanation: string }[];
-	conclusion: string;
-}

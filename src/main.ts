@@ -1,11 +1,12 @@
 import { Editor, MarkdownView, Notice, Plugin } from 'obsidian';
-import { GeminiResponse, PluginSettings, TranscriptResponse } from './types';
+import { PluginSettings, TranscriptResponse } from './types';
 
 import { GeminiService } from './services/gemini';
 import { SettingsTab } from './settings';
 import { StorageService } from './services/storage';
 import { YouTubeService } from './services/youtube';
 import { YouTubeURLModal } from './modals/youtube-url';
+import { PromptService } from './services/prompt';
 
 /**
  * Represents the YouTube Summarizer Plugin.
@@ -16,6 +17,7 @@ export class YouTubeSummarizerPlugin extends Plugin {
 	settings: PluginSettings;
 	private storageService: StorageService;
 	private youtubeService: YouTubeService;
+	private promptService: PromptService;
 	private geminiService: GeminiService;
 	private isProcessing = false;
 
@@ -50,9 +52,14 @@ export class YouTubeSummarizerPlugin extends Plugin {
 
 		// Initialize youtube service
 		this.youtubeService = new YouTubeService();
+	
+		// Load settings
+		this.settings = await this.storageService.getSettings();
+		
+		// Initialize prompt service
+		this.promptService = new PromptService(this.settings.customPrompt);
 
 		// Initialize gemini service
-		this.settings = await this.storageService.getSettings();
 		this.geminiService = new GeminiService(this.settings);
 	}
 
@@ -127,6 +134,7 @@ export class YouTubeSummarizerPlugin extends Plugin {
 
 		// Reinitializes the Gemini service
 		this.geminiService = new GeminiService(this.settings);
+		this.promptService = new PromptService(this.settings.customPrompt);
 	}
 
 	/**
@@ -159,11 +167,11 @@ export class YouTubeSummarizerPlugin extends Plugin {
 				transcript.videoId
 			);
 
+			//Build the prompt for LLM
+			const prompt = this.promptService.buildPrompt(transcript.lines.map((line) => line.text).join(' '));
 			// Generate the summary using Gemini service
 			new Notice('Generating summary...');
-			const geminiSummary = await this.geminiService.summarize(
-				transcript.lines.map((line) => line.text).join(' ')
-			);
+			const geminiSummary = await this.geminiService.summarize(prompt);
 
 			// Create the summary content
 			const summary = this.generateSummary(
@@ -190,39 +198,22 @@ export class YouTubeSummarizerPlugin extends Plugin {
 	 * @param transcript - The transcript response containing the title and author.
 	 * @param thumbnailUrl - The URL of the thumbnail image.
 	 * @param url - The URL of the video.
-	 * @param geminiSummary - The Gemini response containing the summary, key points, technical terms, and conclusion.
+	 * @param summaryText - The Gemini response containing the summary, key points, technical terms, and conclusion.
 	 * @returns A formatted summary string.
 	 */
 	private generateSummary(
 		transcript: TranscriptResponse,
 		thumbnailUrl: string,
 		url: string,
-		geminiSummary: GeminiResponse
+		summaryText: string
 	): string {
 		// Initialize summary parts with title, thumbnail, video link, author, and summary
 		const summaryParts = [
 			`# ${transcript.title}\n`,
 			`![Thumbnail](${thumbnailUrl})\n`,
 			`👤 [${transcript.author}](${transcript.channelUrl})  🔗 [Watch video](${url})`,
-			`## Summary\n${geminiSummary.summary}`,
-			`## Key points\n${geminiSummary.keyPoints
-				.map((point) => `- ${point}`)
-				.join('\n')}`,
+			summaryText,
 		];
-
-		// Add technical terms section if available
-		if (geminiSummary.technicalTerms.length > 0) {
-			summaryParts.push(
-				`## Technical terms\n${geminiSummary.technicalTerms
-					.map(
-						(term) => `- **[[${term.term}]]**: ${term.explanation}`
-					)
-					.join('\n')}`
-			);
-		}
-
-		// Add conclusion section
-		summaryParts.push(`## Conclusion\n${geminiSummary.conclusion}`);
 
 		return summaryParts.join('\n');
 	}
