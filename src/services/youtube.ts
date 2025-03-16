@@ -90,8 +90,8 @@ export class YouTubeService {
 			const response = {
 				url,
 				videoId,
-				title: this.decodeHTML(title || ''),
-				author: this.decodeHTML(author || ''),
+				title: this.decodeHTML(title || 'Unknown'),
+				author: this.decodeHTML(author || 'Unknown'),
 				channelUrl: channelId
 					? `https://www.youtube.com/channel/${channelId}`
 					: '',
