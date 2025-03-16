@@ -53,7 +53,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 };
 
 // Regex pattern for extracting video title from meta tag
-export const TITLE_REGEX = /<meta\s+name="title"\s+content="([^"]*)">/;
+export const TITLE_REGEX = /"title":"([^"]+)"/;
 
 // Regex pattern for extracting video ID from YouTube URL
 export const VIDEO_ID_REGEX = /(?:v=|\/)([a-zA-Z0-9_-]{11})/;
