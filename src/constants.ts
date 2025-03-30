@@ -2,7 +2,9 @@ import { PluginSettings } from './types';
 
 // List of supported Gemini models
 export const GEMINI_MODELS = [
-	'gemini-2.0-flash-exp',
+	'gemini-2.5-pro-exp-03-25',
+	'gemini-2.0-flash',
+	'gemini-2.0-flash-lite',
 	'gemini-1.5-flash',
 	'gemini-1.5-flash-8b',
 	'gemini-1.5-pro',
@@ -46,7 +48,7 @@ Note: Include all sections. If there are no technical terms, omit that section e
 // Default settings for the plugin
 export const DEFAULT_SETTINGS: PluginSettings = {
 	geminiApiKey: '',
-	selectedModel: 'gemini-1.5-pro',
+	selectedModel: GEMINI_MODELS[1],
 	customPrompt: DEFAULT_PROMPT,
 	maxTokens: 3000,
 	temperature: 1,
