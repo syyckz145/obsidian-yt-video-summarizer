@@ -1,7 +1,7 @@
 import { Editor, MarkdownView, Notice, Plugin } from 'obsidian';
 import { PluginSettings, TranscriptResponse } from './types';
+import { initAI, waitForAI } from '@obsidian-ai-providers/sdk';
 
-import { GeminiService } from './services/gemini';
 import { SettingsTab } from './settings';
 import { StorageService } from './services/storage';
 import { YouTubeService } from './services/youtube';
@@ -18,25 +18,26 @@ export class YouTubeSummarizerPlugin extends Plugin {
 	private storageService: StorageService;
 	private youtubeService: YouTubeService;
 	private promptService: PromptService;
-	private geminiService: GeminiService;
 	private isProcessing = false;
 
 	/**
 	 * Called when the plugin is loaded.
 	 */
 	async onload() {
-		try {
-			// Initialize services
-			await this.initializeServices();
+		initAI(this.app, this, async () => {
+			try {
+				// Initialize services
+				await this.initializeServices();
 
-			// Add settings tab
-			this.addSettingTab(new SettingsTab(this.app, this));
+				// Add settings tab
+				this.addSettingTab(new SettingsTab(this.app, this));
 
-			// Register commands
-			this.registerCommands();
-		} catch (error) {
-			new Notice(`Error: ${error.message}`);
-		}
+				// Register commands
+				this.registerCommands();
+			} catch (error) {
+				new Notice(`Error: ${error.message}`);
+			}
+		});
 	}
 
 	/**
@@ -52,15 +53,12 @@ export class YouTubeSummarizerPlugin extends Plugin {
 
 		// Initialize youtube service
 		this.youtubeService = new YouTubeService();
-	
+
 		// Load settings
 		this.settings = await this.storageService.getSettings();
-		
+
 		// Initialize prompt service
 		this.promptService = new PromptService(this.settings.customPrompt);
-
-		// Initialize gemini service
-		this.geminiService = new GeminiService(this.settings);
 	}
 
 	/**
@@ -132,8 +130,7 @@ export class YouTubeSummarizerPlugin extends Plugin {
 		await this.storageService.updateSettings(settings);
 		this.settings = await this.storageService.getSettings();
 
-		// Reinitializes the Gemini service
-		this.geminiService = new GeminiService(this.settings);
+		// Reinitialize the prompt service
 		this.promptService = new PromptService(this.settings.customPrompt);
 	}
 
@@ -152,11 +149,22 @@ export class YouTubeSummarizerPlugin extends Plugin {
 
 		try {
 			this.isProcessing = true;
-			// Ensure the Gemini API key is set
-			if (!this.settings.geminiApiKey) {
+
+			const aiResolver = await waitForAI();
+			const aiProviders = await aiResolver.promise;
+
+			if (!aiProviders || !aiProviders.providers.length) {
 				new Notice(
-					'Gemini API key is missing. Please set it in the plugin settings.'
+					'AI Providers plugin not found or no providers configured. Please install and configure the AI Providers plugin.'
 				);
+				return;
+			}
+
+			// TODO: Allow user to select provider if multiple are available
+			const provider = aiProviders.providers[0];
+
+			if (!provider) {
+				new Notice('No AI provider selected or available.');
 				return;
 			}
 
@@ -169,16 +177,37 @@ export class YouTubeSummarizerPlugin extends Plugin {
 
 			//Build the prompt for LLM
 			const prompt = this.promptService.buildPrompt(transcript.lines.map((line) => line.text).join(' '));
-			// Generate the summary using Gemini service
+
+			// Generate the summary using AI Providers SDK
 			new Notice('Generating summary...');
-			const geminiSummary = await this.geminiService.summarize(prompt);
+			let summaryText = '';
+			const chunkHandler = await aiProviders.execute({
+				provider,
+				prompt,
+			});
+
+			chunkHandler.onData((chunk, accumulatedText) => {
+				summaryText = accumulatedText;
+				// Optionally, update UI with partial results here
+			});
+
+			await new Promise<void>((resolve, reject) => {
+				chunkHandler.onEnd((fullText) => {
+					summaryText = fullText;
+					resolve();
+				});
+				chunkHandler.onError((error) => {
+					new Notice(`Error generating summary: ${error.message}`);
+					reject(error);
+				});
+			});
 
 			// Create the summary content
 			const summary = this.generateSummary(
 				transcript,
 				thumbnailUrl,
 				url,
-				geminiSummary
+				summaryText
 			);
 
 			// Insert the summary into the markdown view

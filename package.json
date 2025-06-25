@@ -30,6 +30,7 @@
 	},
 	"dependencies": {
 		"@google/generative-ai": "^0.21.0",
-		"node-html-parser": "^7.0.1"
+		"node-html-parser": "^7.0.1",
+		"@obsidian-ai-providers/sdk": "^1.1.1"
 	}
 }

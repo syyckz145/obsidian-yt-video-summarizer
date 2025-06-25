@@ -47,11 +47,8 @@ Note: Include all sections. If there are no technical terms, omit that section e
 
 // Default settings for the plugin
 export const DEFAULT_SETTINGS: PluginSettings = {
-	geminiApiKey: '',
-	selectedModel: GEMINI_MODELS[1],
 	customPrompt: DEFAULT_PROMPT,
-	maxTokens: 3000,
-	temperature: 1,
+	selectedProvider: '', // Default to no provider selected
 };
 
 // Regex pattern for extracting video title from meta tag
