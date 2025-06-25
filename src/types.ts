@@ -1,17 +1,7 @@
-import { GEMINI_MODELS } from './constants';
-
-/**
- * List of supported Gemini models
- */
-export type GeminiModel = typeof GEMINI_MODELS[number];
-
 /** Represents the plugin settings */
 export interface PluginSettings {
-	geminiApiKey: string;
-	selectedModel: GeminiModel;
 	customPrompt: string;
-	maxTokens: number;
-	temperature: number;
+	selectedProvider: string; // Stores the ID of the selected AI provider
 }
 
 /** Represents a single line of video transcript with timing information */

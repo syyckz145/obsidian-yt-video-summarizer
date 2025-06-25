@@ -1,7 +1,7 @@
 import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
-import { DEFAULT_SETTINGS, GEMINI_MODELS } from './constants';
+import { DEFAULT_SETTINGS } from './constants';
+import { waitForAI } from '@obsidian-ai-providers/sdk';
 
-import { GeminiModel } from './types';
 import { YouTubeSummarizerPlugin } from './main';
 
 /**
@@ -11,6 +11,7 @@ import { YouTubeSummarizerPlugin } from './main';
  */
 export class SettingsTab extends PluginSettingTab {
 	plugin: YouTubeSummarizerPlugin;
+	selectedProvider: string; // To store the ID of the selected provider
 
 	/**
 	 * Creates an instance of SettingsTab.
@@ -20,6 +21,8 @@ export class SettingsTab extends PluginSettingTab {
 	constructor(app: App, plugin: YouTubeSummarizerPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
+		// Initialize selectedProvider, perhaps from plugin settings if you store it
+		this.selectedProvider = this.plugin.settings.selectedProvider || '';
 	}
 
 	/**
@@ -27,43 +30,59 @@ export class SettingsTab extends PluginSettingTab {
 	 * This method is responsible for rendering the settings controls
 	 * and handling user interactions.
 	 */
-	display(): void {
+	async display(): Promise<void> {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		// Setting for Gemini API Key
-		new Setting(containerEl)
-			.setName('Gemini API key')
-			.setDesc('Enter your Gemini API key')
-			.addText((text) =>
-				text
-					.setPlaceholder('Enter API key')
-					.setValue(this.plugin.settings.geminiApiKey)
-					.onChange(async (value) => {
-						await this.plugin.updateSettings({
-							geminiApiKey: value,
-						});
-					})
-			);
+		// AI Provider selection
+		const aiResolver = await waitForAI();
+		if (!aiResolver) {
+			new Setting(containerEl)
+				.setName('AI Providers Plugin Not Found')
+				.setDesc('Please install and enable the AI Providers plugin to configure an AI provider.');
+			return;
+		}
+		const aiProviders = await aiResolver.promise;
 
-		// Setting for Gemini Model
-		new Setting(containerEl)
-			.setName('Gemini model')
-			.setDesc('Select Gemini model version')
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOptions(
-						Object.fromEntries(
-							GEMINI_MODELS.map((model) => [model, model])
-						)
-					)
-					.setValue(this.plugin.settings.selectedModel)
-					.onChange(async (value) => {
-						await this.plugin.updateSettings({
-							selectedModel: value as GeminiModel,
-						});
-					})
-			);
+		const providers = aiProviders.providers.reduce(
+			(
+				acc: Record<string, string>,
+				provider: { id: string; name: string; model?: string }
+			) => ({
+				...acc,
+				[provider.id]: provider.model
+					? [provider.name, provider.model].join(' ~ ')
+					: provider.name,
+			}),
+			{
+				'': 'Select a provider...', // Default empty option
+			}
+		);
+
+		if (Object.keys(providers).length === 1 && providers[''] === 'Select a provider...') {
+			new Setting(containerEl)
+				.setName('No AI Providers Found')
+				.setDesc(
+					'No AI providers configured in the AI Providers plugin. Please configure one there first.'
+				);
+		} else {
+			new Setting(containerEl)
+				.setName('Select AI Provider')
+				.setDesc('Choose an AI provider for summarization.')
+				.setClass('ai-providers-select') // Optional: for styling
+				.addDropdown(dropdown =>
+					dropdown
+						.addOptions(providers)
+						.setValue(this.selectedProvider)
+						.onChange(async (value) => {
+							this.selectedProvider = value;
+							// Save the selected provider ID to plugin settings
+							await this.plugin.updateSettings({ selectedProvider: value });
+							// Potentially refresh or update other parts of the settings tab if needed
+							// await this.display();
+						})
+				);
+		}
 
 		// Setting for Summary Prompt
 		new Setting(containerEl)
@@ -83,36 +102,6 @@ export class SettingsTab extends PluginSettingTab {
 						textArea.inputEl.style.width = '500px';
 						// Set height to accommodate approximately 10 lines
 						textArea.inputEl.style.height = '200px';
-					})
-			);
-
-		// Setting for Max Tokens
-		new Setting(containerEl)
-			.setName('Max tokens')
-			.setDesc('Maximum number of tokens to generate')
-			.addText((text) =>
-				text
-					.setPlaceholder('Enter max tokens')
-					.setValue(String(this.plugin.settings.maxTokens))
-					.onChange(async (value) => {
-						await this.plugin.updateSettings({
-							maxTokens: Number(value),
-						});
-					})
-			);
-
-		// Setting for Temperature
-		new Setting(containerEl)
-			.setName('Temperature')
-			.setDesc('Temperature parameter for text generation')
-			.addText((text) =>
-				text
-					.setPlaceholder('Enter temperature')
-					.setValue(String(this.plugin.settings.temperature))
-					.onChange(async (value) => {
-						await this.plugin.updateSettings({
-							temperature: Number(value),
-						});
 					})
 			);
 
