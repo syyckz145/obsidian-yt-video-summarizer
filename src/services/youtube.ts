@@ -9,15 +9,41 @@ import {
 	TranscriptLine,
 	TranscriptResponse,
 } from 'src/types';
+import {
+	YouTubeTranscriptApi,
+	TranscriptSnippet,
+	YouTubeTranscriptApiConfig,
+	CouldNotRetrieveTranscript,
+	CouldNotRetrieveTranscriptReason
+} from 'yt-transcript-ts';
+import { ObsidianAxiosAdapter } from './obsidian-request-adapter'; // Import the adapter
 
-import { parse } from 'node-html-parser';
-import { request } from 'obsidian';
+// import { parse } from 'node-html-parser'; // No longer needed for transcript fetching
+import { request } from 'obsidian'; // For fetching metadata directly
 
 /**
  * Service class for interacting with YouTube videos.
  * Provides methods to fetch video thumbnails and transcripts.
  */
 export class YouTubeService {
+	private ytApi: YouTubeTranscriptApi;
+
+	constructor() {
+		// Configure YouTubeTranscriptApi to use the ObsidianAxiosAdapter
+		const apiConfig: YouTubeTranscriptApiConfig = {
+			httpClient: ObsidianAxiosAdapter.create({
+				// We can specify a User-Agent that is less likely to be blocked if necessary.
+				// Obsidian's requestUrl might override or ignore this anyway.
+				headers: {
+					// 'User-Agent': 'Mozilla/5.0 (compatible; ObsidianPlugin/1.0; +https://obsidian.md)'
+				}
+			}),
+			// userAgent for yt-transcript-ts to use if it passes it to its httpClient.
+			// userAgent: 'Mozilla/5.0 (compatible; ObsidianPlugin/1.0; +https://obsidian.md)',
+		};
+		this.ytApi = new YouTubeTranscriptApi(apiConfig);
+	}
+
 	/**
 	 * Gets the thumbnail URL for a YouTube video
 	 * @param videoId - The YouTube video identifier
@@ -72,19 +98,26 @@ export class YouTubeService {
 			const videoId = this.extractMatch(url, VIDEO_ID_REGEX);
 			if (!videoId) throw new Error('Invalid YouTube URL');
 
-			// Fetch the video page content
+			// Fetch the video page content to extract metadata
+			// This part remains as yt-transcript-ts doesn't provide video title, author, etc.
 			const videoPageBody = await request(url);
-
-			// Extract video metadata from page content
 			const title = this.extractMatch(videoPageBody, TITLE_REGEX);
 			const author = this.extractMatch(videoPageBody, AUTHOR_REGEX);
 			const channelId = this.extractMatch(
 				videoPageBody,
 				CHANNEL_ID_REGEX
 			);
-			const captions = await this.extractCaptions(
-				videoPageBody,
-				langCode
+
+			// Fetch transcript using yt-transcript-ts via the adapter
+			const transcript = await this.ytApi.fetchTranscript(videoId, { lang: langCode });
+
+			// Adapt snippets to TranscriptLine format
+			const lines: TranscriptLine[] = transcript.snippets.map(
+				(snippet: TranscriptSnippet) => ({
+					text: this.decodeHTML(snippet.text), // Assuming decodeHTML is still needed
+					duration: snippet.duration * 1000, // Convert seconds to milliseconds
+					offset: snippet.start * 1000, // Convert seconds to milliseconds
+				})
 			);
 
 			const response = {
@@ -95,12 +128,43 @@ export class YouTubeService {
 				channelUrl: channelId
 					? `https://www.youtube.com/channel/${channelId}`
 					: '',
-				lines: this.parseCaptions(captions),
+				lines,
 			};
 
 			return response;
 		} catch (error) {
-			throw new Error(`Failed to fetch transcript: ${error.message}`);
+			if (error instanceof CouldNotRetrieveTranscript) {
+				// Handle specific reasons if necessary, e.g., NoTranscriptFound
+				if (error.reason === CouldNotRetrieveTranscriptReason.NoTranscriptFound ||
+				    error.reason === CouldNotRetrieveTranscriptReason.TranscriptsDisabled) {
+					// Fetch metadata and return with empty lines, as before
+					// This part might be repetitive if videoId, title, etc., are already fetched
+					// and could be refactored if these are available outside the try block.
+					// For now, keeping it simple:
+					const videoIdFromError = this.extractMatch(url, VIDEO_ID_REGEX); // Re-extract or pass videoId
+					if (!videoIdFromError) throw new Error('Invalid YouTube URL on error handling');
+
+					// Re-fetch metadata as it's inside the try block scope
+					// Consider moving metadata fetching outside try if transcript fetching is the main concern
+					const videoPageBody = await request(url);
+					const title = this.extractMatch(videoPageBody, TITLE_REGEX);
+					const author = this.extractMatch(videoPageBody, AUTHOR_REGEX);
+					const channelId = this.extractMatch(videoPageBody, CHANNEL_ID_REGEX);
+
+					console.warn(`Transcript not available for ${videoIdFromError}: ${error.message}`);
+					return {
+						url,
+						videoId: videoIdFromError,
+						title: this.decodeHTML(title || 'Unknown'),
+						author: this.decodeHTML(author || 'Unknown'),
+						channelUrl: channelId ? `https://www.youtube.com/channel/${channelId}` : '',
+						lines: [],
+					};
+				}
+			}
+			// For other errors or if not a CouldNotRetrieveTranscript error, rethrow or wrap
+			console.error('Failed to fetch transcript:', error);
+			throw new Error(`Failed to fetch transcript: ${error.message || error}`);
 		}
 	}
 
@@ -116,71 +180,6 @@ export class YouTubeService {
 	private extractMatch(text: string, regex: RegExp): string | null | '' {
 		const match = text.match(regex);
 		return match ? match[1] : null;
-	}
-
-	/**
-	 * Extracts and fetches captions from the video page content
-	 * @param pageBody - HTML content of the YouTube video page
-	 * @param langCode - Language code for caption track
-	 * @returns Promise containing raw captions XML
-	 * @throws Error if captions cannot be fetched
-	 */
-	private async extractCaptions(
-		pageBody: string,
-		langCode: string
-	): Promise<string> {
-		// Find the script containing player data
-		const parsedBody = parse(pageBody);
-		const playerScript = parsedBody
-			.getElementsByTagName('script')
-			.find((script) =>
-				script.textContent.includes('var ytInitialPlayerResponse = {')
-			);
-
-		if (!playerScript) throw new Error('Failed to find player data');
-
-		// Extract player response data from script content
-		const start =
-			playerScript.textContent.indexOf('var ytInitialPlayerResponse = ') +
-			30;
-		const end = playerScript.textContent.indexOf('};', start) + 1;
-		const dataString = playerScript.textContent.slice(start, end);
-		const data = JSON.parse(dataString);
-
-		// Find available caption tracks and select the desired language
-		const captionTracks =
-			data?.captions?.playerCaptionsTracklistRenderer?.captionTracks ||
-			[];
-		const captionTrack = langCode
-					? captionTracks.find((track: any) =>
-							track.languageCode.includes(langCode)
-					) || captionTracks[0]
-					: captionTracks[0];
-
-		if (!captionTrack) throw new Error('No captions available');
-
-		// Format and fetch captions URL
-		const captionsUrl = captionTrack.baseUrl.startsWith('https://')
-			? captionTrack.baseUrl
-			: `https://www.youtube.com${captionTrack.baseUrl}`;
-		return await request(captionsUrl);
-	}
-
-	/**
-	 * Processes raw captions data into structured format
-	 * @param captionsXML - Raw captions XML data
-	 * @returns Array of structured transcript lines
-	 * @example
-	 * const transcriptLines = this.parseCaptions('<transcript><text start="0.5" dur="2.3">Hello</text></transcript>');
-	 * console.log(transcriptLines); // [{ text: 'Hello', duration: 2300, offset: 500 }]
-	 */
-	private parseCaptions(captionsXML: string): TranscriptLine[] {
-		const parsedXML = parse(captionsXML);
-		return parsedXML.getElementsByTagName('text').map((cue) => ({
-			text: this.decodeHTML(cue.textContent),
-			duration: parseFloat(cue.attributes.dur) * 1000,
-			offset: parseFloat(cue.attributes.start) * 1000,
-		}));
 	}
 
 	/**
