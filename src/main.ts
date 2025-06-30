@@ -171,6 +171,7 @@ export class YouTubeSummarizerPlugin extends Plugin {
 			// Fetch the video transcript
 			new Notice('Fetching video transcript...');
 			const transcript = await this.youtubeService.fetchTranscript(url);
+			new Notice('Transcript fetched successfully!');
 			const thumbnailUrl = YouTubeService.getThumbnailUrl(
 				transcript.videoId
 			);

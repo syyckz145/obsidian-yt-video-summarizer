@@ -51,14 +51,18 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	selectedProvider: '', // Default to no provider selected
 };
 
-// Regex pattern for extracting video title from meta tag
-export const TITLE_REGEX = /"title":"([^"]+)"/;
-
 // Regex pattern for extracting video ID from YouTube URL
-export const VIDEO_ID_REGEX = /(?:v=|\/)([a-zA-Z0-9_-]{11})/;
+export const VIDEO_ID_REGEX = /(?:v=|[\/])([a-zA-Z0-9_-]{11})/;
 
-// Regex pattern for extracting video author from meta tag
-export const AUTHOR_REGEX = /"author":"([^"]+)"/;
+// YouTube URLs
+export const WATCH_URL = 'https://www.youtube.com/watch?v=';
 
-// Regex pattern for extracting channel ID from video page
-export const CHANNEL_ID_REGEX = /"channelId":"([^"]+)"/;
+// InnerTube API
+export const INNERTUBE_API_KEY_REGEX = /"INNERTUBE_API_KEY":\s*"([a-zA-Z0-9_-]+)"/;
+export const INNERTUBE_API_URL = 'https://www.youtube.com/youtubei/v1/player?key=';
+export const INNERTUBE_CONTEXT = {
+    client: {
+        clientName: 'ANDROID',
+        clientVersion: '20.10.38',
+    },
+};

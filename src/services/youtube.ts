@@ -1,17 +1,17 @@
-import {
-	AUTHOR_REGEX,
-	CHANNEL_ID_REGEX,
-	TITLE_REGEX,
-	VIDEO_ID_REGEX,
-} from 'src/constants';
-import {
-	ThumbnailQuality,
-	TranscriptLine,
-	TranscriptResponse,
-} from 'src/types';
-
-import { parse } from 'node-html-parser';
 import { request } from 'obsidian';
+import { parse } from 'node-html-parser';
+import {
+	VIDEO_ID_REGEX,
+	WATCH_URL,
+	INNERTUBE_API_KEY_REGEX,
+	INNERTUBE_API_URL,
+	INNERTUBE_CONTEXT,
+} from '../constants';
+import {
+	TranscriptResponse,
+	TranscriptLine,
+	ThumbnailQuality,
+} from '../types';
 
 /**
  * Service class for interacting with YouTube videos.
@@ -23,9 +23,6 @@ export class YouTubeService {
 	 * @param videoId - The YouTube video identifier
 	 * @param quality - Desired thumbnail quality (default: 'maxres')
 	 * @returns URL string for the video thumbnail
-	 * @example
-	 * const thumbnailUrl = YouTubeService.getThumbnailUrl('dQw4w9WgXcQ', 'maxres');
-	 * console.log(thumbnailUrl); // 'https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg'
 	 */
 	static getThumbnailUrl(
 		videoId: string,
@@ -45,9 +42,6 @@ export class YouTubeService {
 	 * Checks if a URL is a valid YouTube URL
 	 * @param url - The URL to check
 	 * @returns True if the URL is a YouTube URL, false otherwise
-	 * @example
-	 * const isYoutube = YouTubeService.isYouTubeUrl('https://youtube.com/watch?v=dQw4w9WgXcQ');
-	 * console.log(isYoutube); // true
 	 */
 	static isYouTubeUrl(url: string): boolean {
 		return (
@@ -61,121 +55,102 @@ export class YouTubeService {
 	 * @param url - Full YouTube video URL
 	 * @param langCode - Language code for caption track (default: 'en')
 	 * @returns Promise containing video metadata and transcript
-	 * @throws Error if transcript cannot be fetched or processed
 	 */
 	async fetchTranscript(
 		url: string,
 		langCode = 'en'
 	): Promise<TranscriptResponse> {
-		try {
-			// Extract video ID from URL
-			const videoId = this.extractMatch(url, VIDEO_ID_REGEX);
-			if (!videoId) throw new Error('Invalid YouTube URL');
+		const videoId = this.extractMatch(url, VIDEO_ID_REGEX);
+		if (!videoId) throw new Error('Invalid YouTube URL');
 
-			// Fetch the video page content
-			const videoPageBody = await request(url);
+		const videoPageBody = await this._fetchVideoHtml(videoId);
+		const apiKey = this._extractInnertubeApiKey(videoPageBody, videoId);
+		const innertubeData = await this._fetchInnertubeData(videoId, apiKey);
 
-			// Extract video metadata from page content
-			const title = this.extractMatch(videoPageBody, TITLE_REGEX);
-			const author = this.extractMatch(videoPageBody, AUTHOR_REGEX);
-			const channelId = this.extractMatch(
-				videoPageBody,
-				CHANNEL_ID_REGEX
-			);
-			const captions = await this.extractCaptions(
-				videoPageBody,
-				langCode
-			);
+		const captionsJson = this._extractCaptionsJson(innertubeData, videoId);
 
-			const response = {
-				url,
-				videoId,
-				title: this.decodeHTML(title || 'Unknown'),
-				author: this.decodeHTML(author || 'Unknown'),
-				channelUrl: channelId
-					? `https://www.youtube.com/channel/${channelId}`
-					: '',
-				lines: this.parseCaptions(captions),
-			};
+		const captionTrack = this._findCaptionTrack(captionsJson, langCode);
 
-			return response;
-		} catch (error) {
-			throw new Error(`Failed to fetch transcript: ${error.message}`);
+		const transcriptXml = await request(captionTrack.baseUrl);
+		const lines = this._parseTranscript(transcriptXml);
+
+		const { title, author, channelId } = innertubeData.videoDetails;
+
+		return {
+			url,
+			videoId,
+			title: this.decodeHTML(title || 'Unknown'),
+			author: this.decodeHTML(author || 'Unknown'),
+			channelUrl: channelId ? `https://www.youtube.com/channel/${channelId}` : '',
+			lines,
+		};
+	}
+
+	private async _fetchVideoHtml(videoId: string): Promise<string> {
+		const url = `${WATCH_URL}${videoId}`;
+		return await request(url);
+	}
+
+	private _extractInnertubeApiKey(html: string, videoId: string): string {
+		const match = html.match(INNERTUBE_API_KEY_REGEX);
+		if (match && match[1]) {
+			return match[1];
 		}
+		throw new Error(`Failed to extract InnerTube API key for video ${videoId}`);
 	}
 
-	/**
-	 * Extracts the first match of a regex pattern from a string
-	 * @param text - The text to search within
-	 * @param regex - The regex pattern to match
-	 * @returns The first match or null if not found
-	 * @example
-	 * const match = this.extractMatch('Hello World', /Hello/);
-	 * console.log(match); // 'Hello'
-	 */
-	private extractMatch(text: string, regex: RegExp): string | null | '' {
-		const match = text.match(regex);
-		return match ? match[1] : null;
+	private async _fetchInnertubeData(videoId: string, apiKey: string): Promise<any> {
+		const url = `${INNERTUBE_API_URL}${apiKey}`;
+		const response = await request({
+			url,
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				context: INNERTUBE_CONTEXT,
+				videoId,
+			}),
+		});
+		return JSON.parse(response);
 	}
 
-	/**
-	 * Extracts and fetches captions from the video page content
-	 * @param pageBody - HTML content of the YouTube video page
-	 * @param langCode - Language code for caption track
-	 * @returns Promise containing raw captions XML
-	 * @throws Error if captions cannot be fetched
-	 */
-	private async extractCaptions(
-		pageBody: string,
-		langCode: string
-	): Promise<string> {
-		// Find the script containing player data
-		const parsedBody = parse(pageBody);
-		const playerScript = parsedBody
-			.getElementsByTagName('script')
-			.find((script) =>
-				script.textContent.includes('var ytInitialPlayerResponse = {')
-			);
+	private _extractCaptionsJson(innertubeData: any, videoId: string): any {
+		const playabilityStatus = innertubeData?.playabilityStatus?.status;
+		if (playabilityStatus === 'LOGIN_REQUIRED') {
+			throw new Error(`Age-restricted video: ${videoId}`);
+		}
+		if (playabilityStatus === 'ERROR') {
+			throw new Error(`Video unavailable: ${videoId}`);
+		}
 
-		if (!playerScript) throw new Error('Failed to find player data');
-
-		// Extract player response data from script content
-		const start =
-			playerScript.textContent.indexOf('var ytInitialPlayerResponse = ') +
-			30;
-		const end = playerScript.textContent.indexOf('};', start) + 1;
-		const dataString = playerScript.textContent.slice(start, end);
-		const data = JSON.parse(dataString);
-
-		// Find available caption tracks and select the desired language
-		const captionTracks =
-			data?.captions?.playerCaptionsTracklistRenderer?.captionTracks ||
-			[];
-		const captionTrack = langCode
-					? captionTracks.find((track: any) =>
-							track.languageCode.includes(langCode)
-					) || captionTracks[0]
-					: captionTracks[0];
-
-		if (!captionTrack) throw new Error('No captions available');
-
-		// Format and fetch captions URL
-		const captionsUrl = captionTrack.baseUrl.startsWith('https://')
-			? captionTrack.baseUrl
-			: `https://www.youtube.com${captionTrack.baseUrl}`;
-		return await request(captionsUrl);
+		const captions = innertubeData?.captions?.playerCaptionsTracklistRenderer;
+		if (!captions || !captions.captionTracks) {
+			throw new Error(`Transcripts disabled for video: ${videoId}`);
+		}
+		return captions;
 	}
 
-	/**
-	 * Processes raw captions data into structured format
-	 * @param captionsXML - Raw captions XML data
-	 * @returns Array of structured transcript lines
-	 * @example
-	 * const transcriptLines = this.parseCaptions('<transcript><text start="0.5" dur="2.3">Hello</text></transcript>');
-	 * console.log(transcriptLines); // [{ text: 'Hello', duration: 2300, offset: 500 }]
-	 */
-	private parseCaptions(captionsXML: string): TranscriptLine[] {
-		const parsedXML = parse(captionsXML);
+	private _findCaptionTrack(captionsJson: any, langCode: string): any {
+		const captionTracks = captionsJson.captionTracks || [];
+		let track = captionTracks.find((t: any) => t.languageCode === langCode && t.kind !== 'asr');
+		if (!track) {
+			track = captionTracks.find((t: any) => t.languageCode === langCode);
+		}
+		if (!track) {
+			track = captionTracks.find((t: any) => t.languageCode.startsWith(langCode));
+		}
+		if (!track && captionTracks.length > 0) {
+			track = captionTracks[0];
+		}
+
+		if (!track) {
+			throw new Error(`No suitable transcript found for language: ${langCode}`);
+		}
+
+		return track;
+	}
+
+	private _parseTranscript(xml: string): TranscriptLine[] {
+		const parsedXML = parse(xml);
 		return parsedXML.getElementsByTagName('text').map((cue) => ({
 			text: this.decodeHTML(cue.textContent),
 			duration: parseFloat(cue.attributes.dur) * 1000,
@@ -183,15 +158,11 @@ export class YouTubeService {
 		}));
 	}
 
-	/**
-	 * Decodes HTML entities in a text string
-	 *
-	 * @param text - Text string with HTML entities
-	 * @returns Decoded text string
-	 * @example
-	 * const decodedText = this.decodeHTML('Hello &amp; World');
-	 * console.log(decodedText); // 'Hello & World'
-	 */
+	private extractMatch(text: string, regex: RegExp): string | null {
+		const match = text.match(regex);
+		return match ? match[1] : null;
+	}
+
 	private decodeHTML(text: string): string {
 		return text
 			.replace(/&#39;/g, "'")
