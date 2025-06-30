@@ -6,12 +6,13 @@ import {
 } from 'src/constants';
 import {
 	ThumbnailQuality,
-	TranscriptLine,
+	// TranscriptLine, // Will be implicitly typed from youtube-transcript
 	TranscriptResponse,
 } from 'src/types';
 
 import { parse } from 'node-html-parser';
 import { request } from 'obsidian';
+import { YoutubeTranscript, TranscriptLine } from 'youtube-transcript';
 
 /**
  * Service class for interacting with YouTube videos.
@@ -82,12 +83,20 @@ export class YouTubeService {
 				videoPageBody,
 				CHANNEL_ID_REGEX
 			);
-			const captions = await this.extractCaptions(
-				videoPageBody,
-				langCode
-			);
 
-			const response = {
+			// Fetch transcript using youtube-transcript library
+			const transcriptLines: TranscriptLine[] = await YoutubeTranscript.fetchTranscript(videoId, {
+				lang: langCode,
+				country: 'US', // Optional: to potentially improve consistency
+			});
+
+			// Ensure text is decoded (youtube-transcript might already do this, but doesn't hurt to double-check or apply our decoding)
+			const decodedLines = transcriptLines.map(line => ({
+				...line,
+				text: this.decodeHTML(line.text),
+			}));
+
+			const response: TranscriptResponse = {
 				url,
 				videoId,
 				title: this.decodeHTML(title || 'Unknown'),
@@ -95,12 +104,22 @@ export class YouTubeService {
 				channelUrl: channelId
 					? `https://www.youtube.com/channel/${channelId}`
 					: '',
-				lines: this.parseCaptions(captions),
+				lines: decodedLines,
 			};
 
 			return response;
 		} catch (error) {
-			throw new Error(`Failed to fetch transcript: ${error.message}`);
+			if (error instanceof Error) {
+				// Check for specific error messages from the library if needed
+				if (error.message.includes('No transcript found for video')) {
+					throw new Error (`No transcript available for video ID ${videoId} in language '${langCode}'. It might be disabled or not exist.`);
+				}
+				if (error.message.includes('disabled for this video')) {
+					throw new Error (`Transcripts are disabled for video ID ${videoId}.`);
+				}
+				throw new Error(`Failed to fetch transcript for ${videoId}: ${error.message}`);
+			}
+			throw new Error(`Failed to fetch transcript for ${videoId}: An unknown error occurred`);
 		}
 	}
 
@@ -118,70 +137,8 @@ export class YouTubeService {
 		return match ? match[1] : null;
 	}
 
-	/**
-	 * Extracts and fetches captions from the video page content
-	 * @param pageBody - HTML content of the YouTube video page
-	 * @param langCode - Language code for caption track
-	 * @returns Promise containing raw captions XML
-	 * @throws Error if captions cannot be fetched
-	 */
-	private async extractCaptions(
-		pageBody: string,
-		langCode: string
-	): Promise<string> {
-		// Find the script containing player data
-		const parsedBody = parse(pageBody);
-		const playerScript = parsedBody
-			.getElementsByTagName('script')
-			.find((script) =>
-				script.textContent.includes('var ytInitialPlayerResponse = {')
-			);
-
-		if (!playerScript) throw new Error('Failed to find player data');
-
-		// Extract player response data from script content
-		const start =
-			playerScript.textContent.indexOf('var ytInitialPlayerResponse = ') +
-			30;
-		const end = playerScript.textContent.indexOf('};', start) + 1;
-		const dataString = playerScript.textContent.slice(start, end);
-		const data = JSON.parse(dataString);
-
-		// Find available caption tracks and select the desired language
-		const captionTracks =
-			data?.captions?.playerCaptionsTracklistRenderer?.captionTracks ||
-			[];
-		const captionTrack = langCode
-					? captionTracks.find((track: any) =>
-							track.languageCode.includes(langCode)
-					) || captionTracks[0]
-					: captionTracks[0];
-
-		if (!captionTrack) throw new Error('No captions available');
-
-		// Format and fetch captions URL
-		const captionsUrl = captionTrack.baseUrl.startsWith('https://')
-			? captionTrack.baseUrl
-			: `https://www.youtube.com${captionTrack.baseUrl}`;
-		return await request(captionsUrl);
-	}
-
-	/**
-	 * Processes raw captions data into structured format
-	 * @param captionsXML - Raw captions XML data
-	 * @returns Array of structured transcript lines
-	 * @example
-	 * const transcriptLines = this.parseCaptions('<transcript><text start="0.5" dur="2.3">Hello</text></transcript>');
-	 * console.log(transcriptLines); // [{ text: 'Hello', duration: 2300, offset: 500 }]
-	 */
-	private parseCaptions(captionsXML: string): TranscriptLine[] {
-		const parsedXML = parse(captionsXML);
-		return parsedXML.getElementsByTagName('text').map((cue) => ({
-			text: this.decodeHTML(cue.textContent),
-			duration: parseFloat(cue.attributes.dur) * 1000,
-			offset: parseFloat(cue.attributes.start) * 1000,
-		}));
-	}
+	// Removed extractCaptions and parseCaptions methods as they are no longer needed.
+	// The youtube-transcript library handles fetching and parsing.
 
 	/**
 	 * Decodes HTML entities in a text string
